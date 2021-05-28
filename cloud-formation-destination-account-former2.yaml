@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    Generator: "former2"
+Description: ""
+Parameters:
+    SourceAccount:
+        Type: "String"
+        Default: "source-account"
+
+Resources:
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "CAR-Destination-Lambda"
+            Handler: "index.handler"
+            Code: 
+                ZipFile: !Sub |
+                  exports.handler = async (event) => {
+                      const response = {
+                          statusCode: 200,
+                           body: JSON.stringify('Hello from Lambda from another account!'),
+                      };
+                      return response;
+                  };
+            MemorySize: 128
+            Role: !GetAtt IAMRole.Arn
+            Runtime: "nodejs12.x"
+            Timeout: 3
+            TracingConfig: 
+                Mode: "PassThrough"
+
+    IAMRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "CAR-Destination-IAMRole"
+            AssumeRolePolicyDocument: !Sub |
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                   {
+                      "Effect": "Allow",
+                      "Principal": {
+                         "AWS": "arn:aws:iam::${SourceAccount}:role/source-lambda-iam-role",
+                         "Service": "lambda.amazonaws.com"
+                       },
+                      "Action": "sts:AssumeRole"
+                   }
+                ]
+              }
+                 
+            MaxSessionDuration: 3600
+
+    IAMPolicy:
+        Type: "AWS::IAM::Policy"
+        Properties:
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": {
+                        "Effect": "Allow",
+                        "Action": "lambda:InvokeFunction",
+                        "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}"
+                    }
+                }
+            Roles: 
+              - !Ref IAMRole
+            PolicyName: "CAR-invoke-destination-lambda"
+
